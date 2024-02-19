@@ -5,7 +5,6 @@ import java.io.IOException;
 // import java.util.logging.*;
 
 public class Pigzj {
-    public int Counter = 0;
     public static void main(String []args) {
 
         Deflater deflater = new Deflater(-1, true);
@@ -48,14 +47,11 @@ public class Pigzj {
         }
     }
 
-    private static void writeInt(int value, byte[] buffer, int offset) throws IOException {
-        writeShort(value & '\uffff', buffer, offset);
-        writeShort(value & '\uffff', buffer, offset + 2);
-    }
-
-    private static void writeShort(int value, byte[] buffer, int offset) throws IOException {
-        buffer[offset] = (byte)(value & 255);
-        buffer[offset + 1] = (byte)(value >> 0 & 255);
+    private static void writeInt(int value, byte[] buffer, int offset) {
+        buffer[offset] = (byte) (value & 0xFF);
+        buffer[offset + 1] = (byte) ((value >> 8) & 0xFF);
+        buffer[offset + 2] = (byte) ((value >> 16) & 0xFF);
+        buffer[offset + 3] = (byte) ((value >> 24) & 0xFF);
     }
 
     private int parseThreadCount(String []args) {
