@@ -1,29 +1,61 @@
 import Pigzj.CompressionThread;
 
-import java.util.zip.Deflater;
+import java.util.zip.*;
 import java.io.IOException;
 // import java.util.logging.*;
 
 public class Pigzj {
     public int Counter = 0;
     public static void main(String []args) {
-        Pigzj mainPigzj = new Pigzj();
-        int numThreads = mainPigzj.parseThreadCount(args);
 
+        Deflater deflater = new Deflater(-1, true);
+        CRC32 crcChecksummer = new CRC32();
         byte[] defaultHeader = new byte[]{31,-117,8,0,0,0,0,0,0,-1};
-
         byte[] dictionary = new byte['\u8000'];
-        byte[] contentSize = new byte[131072];
-        byte[] compressedBlock = new byte[131072];
 
-        Deflater newDeflater = new Deflater(-1, true);
-        newDeflater.setDictionary(dictionary);
-        newDeflater.setInput(contentSize);
-        // only call finish on last block of file
-        newDeflater.finish();
-        int sizeOfCompressedBlock = newDeflater.deflate(compressedBlock);
-        // when done with deflater (destructor?)
-        newDeflater.end();
+        deflater.setDictionary(dictionary);
+
+        try {
+            // Read uncompressed data from stdin
+            byte[] content = System.in.readAllBytes();
+            System.err.println("Size of uncompressed file in bytes: " + content.length);
+            
+            // Update CRC32 checksum on uncompressed data
+            crcChecksummer.update(content);
+
+            // Write default GZIP header to stdout
+            System.out.write(defaultHeader);
+
+            // Compress data and write to stdout
+            deflater.setInput(content);
+            deflater.finish();
+            int bufferSize = 128 * 1024;
+            byte[] buffer = new byte[bufferSize];
+            int compressedBytes;
+            while ((compressedBytes = deflater.deflate(buffer)) > 0) {
+                System.out.write(buffer, 0, compressedBytes);
+            }
+
+            // Write CRC32 checksum and uncompressed size to stdout
+            byte[] trailer = new byte[8];
+            writeInt((int)crcChecksummer.getValue(), trailer, 0);
+            writeInt(content.length, trailer, 4);
+            System.out.write(trailer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            deflater.end();
+        }
+    }
+
+    private static void writeInt(int value, byte[] buffer, int offset) throws IOException {
+        writeShort(value & '\uffff', buffer, offset);
+        writeShort(value & '\uffff', buffer, offset + 2);
+    }
+
+    private static void writeShort(int value, byte[] buffer, int offset) throws IOException {
+        buffer[offset] = (byte)(value & 255);
+        buffer[offset + 1] = (byte)(value >> 0 & 255);
     }
 
     private int parseThreadCount(String []args) {
