@@ -3,11 +3,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.zip.Deflater;
+import java.util.zip.*;
 
 public class Pigzj {
     private static final int BLOCK_SIZE = 128 * 1024;
-    private static final int DICT_SIZE = 32 * 1024;
 
     public static void main(String[] args) {
         int processes = Runtime.getRuntime().availableProcessors();
@@ -30,15 +29,17 @@ public class Pigzj {
         }
 
         ExecutorService executor = Executors.newFixedThreadPool(processes);
+        CRC32 checksummer = new CRC32();
 
+        writeHeader();
         try {
             compress(System.in, System.out, executor);
         } catch (IOException e) {
             System.err.println("Error: I/O exception occurred - " + e.getMessage());
             System.exit(1);
         }
-
         executor.shutdown();
+        writeTrailer(checksummer, 42);
     }
 
     private static void compress(InputStream in, OutputStream out, ExecutorService executor) throws IOException {
@@ -51,6 +52,36 @@ public class Pigzj {
             inputBuffer = new byte[BLOCK_SIZE]; // reset input buffer
             outputBuffer = new byte[BLOCK_SIZE]; // reset output buffer
         }
+    }
+
+    private static void writeHeader() {
+        System.err.println("writing header to stdout");
+        try {
+            byte[] defaultHeader = new byte[]{31,-117,8,0,0,0,0,0,0,-1};
+            System.out.write(defaultHeader);
+        } catch (Exception e) {
+            e.getStackTrace();
+        }
+    }
+
+    // Write CRC32 checksum and uncompressed size to stdout
+    private static void writeTrailer(CRC32 crcChecksummer, int contentLength) {
+        System.err.println("writing trailer to stdout");
+        try {
+            byte[] trailer = new byte[8];
+            writeInt((int)crcChecksummer.getValue(), trailer, 0);
+            writeInt(contentLength, trailer, 4);
+            System.out.write(trailer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void writeInt(int value, byte[] buffer, int offset) {
+        buffer[offset] = (byte) (value & 0xFF);
+        buffer[offset + 1] = (byte) ((value >> 8) & 0xFF);
+        buffer[offset + 2] = (byte) ((value >> 16) & 0xFF);
+        buffer[offset + 3] = (byte) ((value >> 24) & 0xFF);
     }
 
     private static class CompressTask implements Runnable {
