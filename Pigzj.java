@@ -12,29 +12,12 @@ public class Pigzj {
     private static final int BLOCK_SIZE = 128 * 1024;
 
     public static void main(String[] args) {
-        int processes = Runtime.getRuntime().availableProcessors();
-        if (args.length > 0) {
-            if (args[0].equals("-p") && args.length > 1) {
-                try {
-                    processes = Integer.parseInt(args[1]);
-                    if (processes <= 0 || processes > 4 * Runtime.getRuntime().availableProcessors()) {
-                        System.err.println("Error: Invalid number of processes.");
-                        System.exit(1);
-                    }
-                } catch (NumberFormatException e) {
-                    System.err.println("Error: Invalid argument for -p option.");
-                    System.exit(1);
-                }
-            } else {
-                System.err.println("Error: Invalid option.");
-                System.exit(1);
-            }
-        }
 
-        writeHeader();
+        int threads = parseThreads(args);
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
         CRC32 checksummer = new CRC32();
+        writeHeader();
         int bytesCompressed = 0;
-        ExecutorService executor = Executors.newFixedThreadPool(processes);
         try {
             bytesCompressed = compress(System.in, System.out, executor, checksummer);
         } catch (IOException e) {
@@ -115,11 +98,13 @@ public class Pigzj {
         }
 
         public synchronized void outputCompressedBlock() {
-            System.err.println("writing block from outputQueue at index: "+this.outputBlockIndex);
             if (this.outputQueue.containsKey(this.outputBlockIndex)) {
                 byte[] block = this.outputQueue.get(this.outputBlockIndex);
+                System.err.println("writing block from outputQueue at index: "+this.outputBlockIndex);
                 System.out.write(block, 0, block.length);
                 this.outputBlockIndex++;
+            } else{
+                System.err.println("attempted to write block from outputQueue at index: "+this.outputBlockIndex+"...no block there yet");
             }
         }
     }
@@ -175,5 +160,27 @@ public class Pigzj {
         buffer[offset + 1] = (byte) ((value >> 8) & 0xFF);
         buffer[offset + 2] = (byte) ((value >> 16) & 0xFF);
         buffer[offset + 3] = (byte) ((value >> 24) & 0xFF);
+    }
+
+    private static int parseThreads(String[] args) {
+        int processes = Runtime.getRuntime().availableProcessors();
+        if (args.length > 0) {
+            if (args[0].equals("-p") && args.length > 1) {
+                try {
+                    processes = Integer.parseInt(args[1]);
+                    if (processes <= 0 || processes > 4 * Runtime.getRuntime().availableProcessors()) {
+                        System.err.println("Error: Invalid number of processes.");
+                        System.exit(1);
+                    }
+                } catch (NumberFormatException e) {
+                    System.err.println("Error: Invalid argument for -p option.");
+                    System.exit(1);
+                }
+            } else {
+                System.err.println("Error: Invalid option.");
+                System.exit(1);
+            }
+        }
+        return processes;
     }
 }
