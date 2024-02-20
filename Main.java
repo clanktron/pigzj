@@ -1,50 +1,29 @@
-import Pigzj.CompressionThread;
-
+import Pigzj.*;
 import java.util.zip.*;
+import java.util.concurrent.*;
 import java.io.IOException;
 // import java.util.logging.*;
 
-public class Pigzj {
+public class Main {
     public static void main(String []args) {
 
-        Deflater deflater = new Deflater(-1, true);
+        // ExecutorService executorService = new Executors.newFixedThreadPool(4);
+        // int threadCount = parseThreadCount(args);
+        int threadCount = 4;
+        BlockingQueue<byte[]> inputQueue = new LinkedBlockingDeque<>(threadCount);
+        BlockingQueue<byte[]> outputQueue = new LinkedBlockingDeque<>(threadCount);
         CRC32 crcChecksummer = new CRC32();
-        byte[] defaultHeader = new byte[]{31,-117,8,0,0,0,0,0,0,-1};
-        byte[] dictionary = new byte['\u8000'];
 
-        deflater.setDictionary(dictionary);
+        writeHeader();
 
-        try {
-            // Read uncompressed data from stdin
-            byte[] content = System.in.readAllBytes();
-            System.err.println("Size of uncompressed file in bytes: " + content.length);
-            
-            // Update CRC32 checksum on uncompressed data
-            crcChecksummer.update(content);
-
-            // Write default GZIP header to stdout
-            System.out.write(defaultHeader);
-
-            // Compress data and write to stdout
-            deflater.setInput(content);
-            deflater.finish();
-            int bufferSize = 128 * 1024;
-            byte[] buffer = new byte[bufferSize];
-            int compressedBytes;
-            while ((compressedBytes = deflater.deflate(buffer)) > 0) {
-                System.out.write(buffer, 0, compressedBytes);
-            }
-
-            // Write CRC32 checksum and uncompressed size to stdout
-            byte[] trailer = new byte[8];
-            writeInt((int)crcChecksummer.getValue(), trailer, 0);
-            writeInt(content.length, trailer, 4);
-            System.out.write(trailer);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            deflater.end();
+        // spin up threads
+        for (int i = 0; i < threadCount; i++) {
+            new Thread(new CompressionProcessor(inputQueue, outputQueue, crcChecksummer)).start();
         }
+
+        int contentLength = 24;
+        writeTrailer(crcChecksummer, contentLength);
+
     }
 
     private static void writeInt(int value, byte[] buffer, int offset) {
@@ -54,7 +33,28 @@ public class Pigzj {
         buffer[offset + 3] = (byte) ((value >> 24) & 0xFF);
     }
 
-    private int parseThreadCount(String []args) {
+    private static void writeHeader() {
+        try {
+            byte[] defaultHeader = new byte[]{31,-117,8,0,0,0,0,0,0,-1};
+            System.out.write(defaultHeader);
+        } catch (Exception e) {
+            e.getStackTrace();
+        }
+    }
+
+    // Write CRC32 checksum and uncompressed size to stdout
+    private static void writeTrailer(CRC32 crcChecksummer, int contentLength) {
+        try {
+            byte[] trailer = new byte[8];
+            writeInt((int)crcChecksummer.getValue(), trailer, 0);
+            writeInt(contentLength, trailer, 4);
+            System.out.write(trailer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static int parseThreadCount(String []args) {
         int numThreads = 1;
         // Check if the flag -p is present
         boolean flagP = false;
