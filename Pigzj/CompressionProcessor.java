@@ -19,16 +19,20 @@ public class CompressionProcessor implements Runnable {
         this.checksummer = checksummer;
     }
     public void run() {
-        while(true) {
+        int compressedBlockSize = 1;
+        while(compressedBlockSize > 0) {
             try {
                 byte[] block = getNextBlock();
+                System.err.println("got next block; size="+block.length+"bytes");
                 synchronized(checksummer) {
                     this.checksummer.update(block);
+                    System.err.println("added uncompressed block to checksummer");
                 }
-                this.deflater.setInput(block);
                 byte[] compressedBlock = new byte[BLOCK_SIZE];
+                this.deflater.setInput(block);
                 this.deflater.finish();
-                this.deflater.deflate(compressedBlock);
+                compressedBlockSize = this.deflater.deflate(compressedBlock);
+                System.err.println("compressed block");
                 this.outputQueue.put(compressedBlock);
                 writeCompressedBlock();
             } catch (InterruptedException e) {
@@ -44,6 +48,7 @@ public class CompressionProcessor implements Runnable {
             synchronized(System.in) {
                 nextBlock = System.in.readNBytes(BLOCK_SIZE);
             }
+            System.err.println("got next block from stdin, adding to inputQueue...");
             this.inputQueue.put(nextBlock);
         }
         catch (Exception e) {
@@ -54,6 +59,7 @@ public class CompressionProcessor implements Runnable {
     private void writeCompressedBlock() {
         try {
             byte[] compressedBlock = this.outputQueue.take();
+            System.err.println("got next block from outputQueue, writing to stdout...");
             synchronized(System.out) {
                 System.out.write(compressedBlock, 0, compressedBlock.length);
             }

@@ -18,11 +18,13 @@ public class Main {
 
         // spin up threads
         for (int i = 0; i < threadCount; i++) {
+            System.err.println("starting thread "+i+"...");
             new Thread(new CompressionProcessor(inputQueue, outputQueue, crcChecksummer)).start();
         }
 
         int contentLength = 24;
         writeTrailer(crcChecksummer, contentLength);
+        System.err.println("done!");
 
     }
 
@@ -34,6 +36,7 @@ public class Main {
     }
 
     private static void writeHeader() {
+        System.err.println("writing header to stdout");
         try {
             byte[] defaultHeader = new byte[]{31,-117,8,0,0,0,0,0,0,-1};
             System.out.write(defaultHeader);
@@ -44,6 +47,7 @@ public class Main {
 
     // Write CRC32 checksum and uncompressed size to stdout
     private static void writeTrailer(CRC32 crcChecksummer, int contentLength) {
+        System.err.println("writing trailer to stdout");
         try {
             byte[] trailer = new byte[8];
             writeInt((int)crcChecksummer.getValue(), trailer, 0);
