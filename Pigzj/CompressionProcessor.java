@@ -27,6 +27,7 @@ public class CompressionProcessor implements Runnable {
                 }
                 this.deflater.setInput(block);
                 byte[] compressedBlock = new byte[BLOCK_SIZE];
+                this.deflater.finish();
                 this.deflater.deflate(compressedBlock);
                 this.outputQueue.put(compressedBlock);
                 writeCompressedBlock();
