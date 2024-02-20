@@ -3,6 +3,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.*;
 
 public class Pigzj {
@@ -28,30 +29,34 @@ public class Pigzj {
             }
         }
 
-        ExecutorService executor = Executors.newFixedThreadPool(processes);
-        CRC32 checksummer = new CRC32();
-
         writeHeader();
+        CRC32 checksummer = new CRC32();
+        int bytesCompressed = 0;
+        ExecutorService executor = Executors.newFixedThreadPool(processes);
         try {
-            compress(System.in, System.out, executor);
+            bytesCompressed = compress(System.in, System.out, executor, checksummer);
         } catch (IOException e) {
             System.err.println("Error: I/O exception occurred - " + e.getMessage());
             System.exit(1);
         }
         executor.shutdown();
-        writeTrailer(checksummer, 42);
+        writeTrailer(checksummer, bytesCompressed);
     }
 
-    private static void compress(InputStream in, OutputStream out, ExecutorService executor) throws IOException {
+    private static int compress(InputStream in, OutputStream out, ExecutorService executor, CRC32 checksummer) throws IOException {
         byte[] inputBuffer = new byte[BLOCK_SIZE];
         byte[] outputBuffer = new byte[BLOCK_SIZE];
 
         int bytesRead;
+        int totalBytesRead = 0;
         while ((bytesRead = in.read(inputBuffer)) != -1) {
+            checksummer.update(inputBuffer);
             executor.execute(new CompressTask(inputBuffer, bytesRead, outputBuffer, out));
             inputBuffer = new byte[BLOCK_SIZE]; // reset input buffer
             outputBuffer = new byte[BLOCK_SIZE]; // reset output buffer
+            totalBytesRead = totalBytesRead + bytesRead;
         }
+        return totalBytesRead;
     }
 
     private static void writeHeader() {
@@ -66,7 +71,7 @@ public class Pigzj {
 
     // Write CRC32 checksum and uncompressed size to stdout
     private static void writeTrailer(CRC32 crcChecksummer, int contentLength) {
-        System.err.println("writing trailer to stdout");
+        System.err.println("writing trailer to stdout - total bytes compressed: "+contentLength);
         try {
             byte[] trailer = new byte[8];
             writeInt((int)crcChecksummer.getValue(), trailer, 0);
