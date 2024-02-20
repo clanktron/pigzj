@@ -4,6 +4,8 @@ import java.io.OutputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.zip.*;
 
 public class Pigzj {
@@ -46,17 +48,103 @@ public class Pigzj {
     private static int compress(InputStream in, OutputStream out, ExecutorService executor, CRC32 checksummer) throws IOException {
         byte[] inputBuffer = new byte[BLOCK_SIZE];
         byte[] outputBuffer = new byte[BLOCK_SIZE];
+        ProcessQueue processQueue = new ProcessQueue();
 
         int bytesRead;
         int totalBytesRead = 0;
         while ((bytesRead = in.read(inputBuffer)) != -1) {
+            totalBytesRead = totalBytesRead + bytesRead;
             checksummer.update(inputBuffer);
-            executor.execute(new CompressTask(inputBuffer, bytesRead, outputBuffer, out));
+            processQueue.addBlockToCompressionQueue(inputBuffer);
+            executor.execute(new CompressTask(processQueue, outputBuffer, out));
+            processQueue.outputCompressedBlock();
             inputBuffer = new byte[BLOCK_SIZE]; // reset input buffer
             outputBuffer = new byte[BLOCK_SIZE]; // reset output buffer
-            totalBytesRead = totalBytesRead + bytesRead;
         }
+        processQueue.outputCompressedBlock();
         return totalBytesRead;
+    }
+
+    private static class Block {
+        long index;
+        byte[] content;
+        public Block(long index, byte[] block) {
+            this.index = index;
+            this.content = block;
+        }
+    }
+
+    private static class ProcessQueue {
+        BlockingQueue<byte[]> compressionQueue; 
+        ConcurrentHashMap<Long, byte[]> outputQueue; 
+        volatile long outputBlockIndex;
+        volatile long compressedBlockIndex;
+
+        public ProcessQueue() {
+            this.outputQueue = new ConcurrentHashMap<>();
+            this.compressionQueue = new LinkedBlockingQueue<byte[]>();
+            this.compressedBlockIndex = 0 ;
+            this.outputBlockIndex = 0 ;
+            this.compressionQueue = compressionQueue;
+        }
+
+        public Block getNextUncompressedBlock() {
+            byte[] uncompressedContent = new byte[0];
+            try {
+                uncompressedContent = this.compressionQueue.take(); 
+            } catch (Exception e) {
+                e.getStackTrace();
+            }
+            Block block = new Block(this.compressedBlockIndex, uncompressedContent);
+            this.compressedBlockIndex++;
+            return block;
+        }
+
+        public void addBlockToOutputQueue(Block block) {
+            System.err.println("adding block to outputQueue at index: "+block.index);
+            this.outputQueue.put(block.index, block.content);
+        }
+
+        public void addBlockToCompressionQueue(byte[] block) {
+            try {
+                // System.err.println("adding block to compressionQueue");
+                this.compressionQueue.put(block);
+            } catch (Exception e) {
+                e.getStackTrace();
+            }
+        }
+
+        public synchronized void outputCompressedBlock() {
+            System.err.println("writing block from outputQueue at index: "+this.outputBlockIndex);
+            if (this.outputQueue.containsKey(this.outputBlockIndex)) {
+                byte[] block = this.outputQueue.get(this.outputBlockIndex);
+                System.out.write(block, 0, block.length);
+                this.outputBlockIndex++;
+            }
+        }
+    }
+
+    private static class CompressTask implements Runnable {
+        private final ProcessQueue processQueue; 
+        private final byte[] outputBuffer;
+        private final OutputStream out;
+
+        public CompressTask(ProcessQueue processQueue, byte[] outputBuffer, OutputStream out) {
+            this.processQueue = processQueue;
+            this.outputBuffer = outputBuffer;
+            this.out = out;
+        }
+
+        @Override
+        public void run() {
+            Deflater deflater = new Deflater();
+            Block block = this.processQueue.getNextUncompressedBlock();
+            deflater.setInput(block.content, 0, block.content.length);
+            deflater.finish();
+            deflater.deflate(outputBuffer);
+            this.processQueue.addBlockToOutputQueue(block);
+            deflater.end();
+        }
     }
 
     private static void writeHeader() {
@@ -87,34 +175,5 @@ public class Pigzj {
         buffer[offset + 1] = (byte) ((value >> 8) & 0xFF);
         buffer[offset + 2] = (byte) ((value >> 16) & 0xFF);
         buffer[offset + 3] = (byte) ((value >> 24) & 0xFF);
-    }
-
-    private static class CompressTask implements Runnable {
-        private final byte[] inputBuffer;
-        private final int bytesRead;
-        private final byte[] outputBuffer;
-        private final OutputStream out;
-
-        public CompressTask(byte[] inputBuffer, int bytesRead, byte[] outputBuffer, OutputStream out) {
-            this.inputBuffer = inputBuffer;
-            this.bytesRead = bytesRead;
-            this.outputBuffer = outputBuffer;
-            this.out = out;
-        }
-
-        @Override
-        public void run() {
-            Deflater deflater = new Deflater();
-            deflater.setInput(inputBuffer, 0, bytesRead);
-            deflater.finish();
-            int compressedSize = deflater.deflate(outputBuffer);
-            try {
-                out.write(outputBuffer, 0, compressedSize);
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                deflater.end();
-            }
-        }
     }
 }
