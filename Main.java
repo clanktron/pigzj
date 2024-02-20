@@ -7,9 +7,10 @@ import java.io.IOException;
 public class Main {
     public static void main(String []args) {
 
-        // ExecutorService executorService = new Executors.newFixedThreadPool(4);
         // int threadCount = parseThreadCount(args);
-        int threadCount = 4;
+        int threadCount = 1;
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
         BlockingQueue<byte[]> inputQueue = new LinkedBlockingDeque<>(threadCount);
         BlockingQueue<byte[]> outputQueue = new LinkedBlockingDeque<>(threadCount);
         CRC32 crcChecksummer = new CRC32();
@@ -22,6 +23,13 @@ public class Main {
             new Thread(new CompressionProcessor(inputQueue, outputQueue, crcChecksummer)).start();
         }
 
+        try {
+            latch.await(); // Wait for all threads to finish
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        executorService.shutdown(); // Shutdown the executor service
         int contentLength = 24;
         writeTrailer(crcChecksummer, contentLength);
         System.err.println("done!");
