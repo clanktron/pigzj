@@ -19,10 +19,10 @@ public class CompressionProcessor implements Runnable {
         this.checksummer = checksummer;
     }
     public void run() {
-        int compressedBlockSize = 1;
-        while(compressedBlockSize > 0) {
+        byte[] block = new byte[1];
+        while(block.length != 0) {
             try {
-                byte[] block = getNextBlock();
+                block = getNextBlock();
                 System.err.println("got next block; size="+block.length+"bytes");
                 synchronized(checksummer) {
                     this.checksummer.update(block);
@@ -31,7 +31,7 @@ public class CompressionProcessor implements Runnable {
                 byte[] compressedBlock = new byte[BLOCK_SIZE];
                 this.deflater.setInput(block);
                 this.deflater.finish();
-                compressedBlockSize = this.deflater.deflate(compressedBlock);
+                this.deflater.deflate(compressedBlock);
                 System.err.println("compressed block");
                 this.outputQueue.put(compressedBlock);
                 writeCompressedBlock();
