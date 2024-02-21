@@ -2,12 +2,13 @@ import java.util.zip.*;
 import java.util.concurrent.*;
 
 class CompressTask implements Runnable {
+    private static final int BLOCK_SIZE = 128 * 1024;
     private final ProcessQueue processQueue; 
     private final byte[] outputBuffer;
 
-    public CompressTask(ProcessQueue processQueue, byte[] outputBuffer) {
+    public CompressTask(ProcessQueue processQueue) {
         this.processQueue = processQueue;
-        this.outputBuffer = outputBuffer;
+        this.outputBuffer = new byte[BLOCK_SIZE];
     }
 
     public void run() {
