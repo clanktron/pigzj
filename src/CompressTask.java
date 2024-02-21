@@ -13,7 +13,7 @@ class CompressTask implements Runnable {
     public void run() {
         Deflater deflater = new Deflater();
         Block block = this.processQueue.getNextUncompressedBlock();
-        deflater.setInput(block.content, 0, block.content.length);
+        deflater.setInput(block.content);
         deflater.finish();
         deflater.deflate(outputBuffer);
         block.content = outputBuffer;

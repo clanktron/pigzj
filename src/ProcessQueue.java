@@ -44,8 +44,12 @@ class ProcessQueue {
         if (this.outputQueue.containsKey(this.outputBlockIndex)) {
             byte[] block = this.outputQueue.get(this.outputBlockIndex);
             System.err.println("writing block from outputQueue at index: "+this.outputBlockIndex);
-            System.out.write(block, 0, block.length);
-            this.outputBlockIndex++;
+            try {
+                System.out.write(block);
+                this.outputBlockIndex++;
+            } catch (Exception e) {
+                e.getStackTrace();
+            }
         } else{
             System.err.println("attempted to write block from outputQueue at index: "+this.outputBlockIndex+"...no block there yet");
         }
