@@ -39,7 +39,7 @@ public class Pigzj {
             totalBytesRead = totalBytesRead + bytesRead;
             checksummer.update(inputBuffer);
             processQueue.addBlockToCompressionQueue(inputBuffer);
-            executor.execute(new CompressTask(processQueue, outputBuffer, out));
+            executor.execute(new CompressTask(processQueue, outputBuffer));
             processQueue.outputCompressedBlock();
             inputBuffer = new byte[BLOCK_SIZE]; // reset input buffer
             outputBuffer = new byte[BLOCK_SIZE]; // reset output buffer
@@ -112,12 +112,10 @@ public class Pigzj {
     private static class CompressTask implements Runnable {
         private final ProcessQueue processQueue; 
         private final byte[] outputBuffer;
-        private final OutputStream out;
 
-        public CompressTask(ProcessQueue processQueue, byte[] outputBuffer, OutputStream out) {
+        public CompressTask(ProcessQueue processQueue, byte[] outputBuffer) {
             this.processQueue = processQueue;
             this.outputBuffer = outputBuffer;
-            this.out = out;
         }
 
         @Override
@@ -127,6 +125,7 @@ public class Pigzj {
             deflater.setInput(block.content, 0, block.content.length);
             deflater.finish();
             deflater.deflate(outputBuffer);
+            block.content = outputBuffer;
             this.processQueue.addBlockToOutputQueue(block);
             deflater.end();
         }
