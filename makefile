@@ -1,10 +1,10 @@
-PROGRAM=Main
+PROGRAM=Pigzj
 SRC=$(shell find . -name '*.java')
 TARGET_DIR=./target
 TEST_DIR=./workdir
-INPUT=input-long
+INPUT=input
 INPUT_FILE=$(TEST_DIR)/$(INPUT)
-OUTPUT_FILE=$(TEST_DIR)/output-pigzj-multi-$(INPUT)
+OUTPUT_FILE=./pigzj-test
 
 compile:
 	javac $(SRC) -d $(TARGET_DIR)
@@ -16,4 +16,4 @@ test: run
 	./test.sh pigzj
 
 clean:
-	rm -r $(TARGET_DIR)/*
+	rm -r $(TARGET_DIR)/* $(OUTPUT_FILE)
