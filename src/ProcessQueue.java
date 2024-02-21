@@ -46,6 +46,7 @@ class ProcessQueue {
             System.err.println("writing block from outputQueue at index: "+this.outputBlockIndex);
             try {
                 System.out.write(block);
+                this.outputQueue.remove(this.outputBlockIndex);
                 this.outputBlockIndex++;
             } catch (Exception e) {
                 e.getStackTrace();
