@@ -30,13 +30,14 @@ public class Pigzj {
     private static int compress(InputStream in, OutputStream out, ExecutorService executor, CRC32 checksummer) throws IOException {
         byte[] inputBuffer = new byte[BLOCK_SIZE];
         ProcessQueue processQueue = new ProcessQueue();
-        int totalBytesRead = 0;
-
         int bytesRead;
-        while ((bytesRead = in.read(inputBuffer)) != -1) {
+        int totalBytesRead = 0;
+        while ((bytesRead = in.read(inputBuffer)) > 0) {
             totalBytesRead = totalBytesRead + bytesRead;
-            checksummer.update(inputBuffer);
-            processQueue.addBlockToCompressionQueue(inputBuffer);
+            byte[] trimmedBuffer = new byte[bytesRead];
+            System.arraycopy(inputBuffer, 0, trimmedBuffer, 0, bytesRead);
+            checksummer.update(trimmedBuffer);
+            processQueue.addBlockToCompressionQueue(trimmedBuffer);
             executor.execute(new CompressTask(processQueue));
             processQueue.outputCompressedBlock();
             inputBuffer = new byte[BLOCK_SIZE]; // reset input buffer
