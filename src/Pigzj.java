@@ -24,7 +24,6 @@ public class Pigzj {
             System.err.println("Error: I/O exception occurred - " + e.getMessage());
             System.exit(1);
         }
-        executor.shutdown();
         writeTrailer(checksummer, bytesCompressed);
     }
 
@@ -42,7 +41,10 @@ public class Pigzj {
             processQueue.outputCompressedBlock();
             inputBuffer = new byte[BLOCK_SIZE]; // reset input buffer
         }
-        processQueue.outputCompressedBlock();
+        executor.shutdown();
+        while(!processQueue.outputQueue.isEmpty()) {
+            processQueue.outputCompressedBlock();
+        }
         return totalBytesRead;
     }
 
