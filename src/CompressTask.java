@@ -16,8 +16,11 @@ class CompressTask implements Runnable {
         Block block = this.processQueue.getNextUncompressedBlock();
         deflater.setInput(block.content);
         deflater.finish();
-        deflater.deflate(outputBuffer);
-        block.content = outputBuffer;
+        int compressedSize = deflater.deflate(outputBuffer);
+        // Resize buffer to exact compressed size
+        byte[] compressedBuffer = new byte[compressedSize];
+        System.arraycopy(outputBuffer, 0, compressedBuffer, 0, compressedSize);
+        block.content = compressedBuffer;
         this.processQueue.addBlockToOutputQueue(block);
         deflater.end();
     }
